@@ -72,10 +72,15 @@ public:
 
 private:
 	void ProcessHitResult(const TArray<FHitResult>& HitResults);
+	
+
+	void HideRope();
 protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	class UCableComponent* myrope = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		bool bIsConstraintSwing = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		float tmpmin = 200;
@@ -83,9 +88,33 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		class UPhysicsConstraintComponent* myphycon = nullptr;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		class ASwingEmulator* swingemu = nullptr;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		TSubclassOf<class ASwingEmulator> SwingEmuClass = nullptr;
+	virtual void BeginPlay() override;
+
+
+	UFUNCTION(BlueprintCallable)
+		void ConstraintSwing();
+
+	UFUNCTION(BlueprintCallable)
+		void RelaseConstraintSwing();
+
+	UFUNCTION(BlueprintCallable)
+		void ReleaseSilk();
+
+	UFUNCTION(BlueprintCallable)
+		void SetConstraintSwing();
 public:
 	void ShootSilk();
-	bool bIsSilking = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		bool bIsSilking = false;
 	FVector silk_target_pos = FVector::ZeroVector;
 
 	void Tick(float DeltaTime) override;

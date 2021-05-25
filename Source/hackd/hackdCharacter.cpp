@@ -13,6 +13,7 @@
 #include "Kismet/GameplayStatics.h" 
 #include "Components/LineBatchComponent.h"
 #include "PhysicsEngine/PhysicsConstraintComponent.h"
+#include "SwingEmulator.h"
 //////////////////////////////////////////////////////////////////////////
 // AhackdCharacter
 
@@ -65,8 +66,8 @@ AhackdCharacter::AhackdCharacter()
 	myrope = CreateDefaultSubobject<UCableComponent>(TEXT("MySilkRope"));
 	myrope->SetupAttachment(RootComponent);  
 
-	myphycon = CreateDefaultSubobject<UPhysicsConstraintComponent>(TEXT("myphycon"));
-	myphycon->SetupAttachment(RootComponent);
+	//myphycon = CreateDefaultSubobject<UPhysicsConstraintComponent>(TEXT("myphycon"));
+	//myphycon->SetupAttachment(RootComponent);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -80,7 +81,9 @@ void AhackdCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerInp
 	PlayerInputComponent->BindAction("Jump", IE_Released, this, &ACharacter::StopJumping);
 
 	PlayerInputComponent->BindAction("ShootSilk", IE_Released, this, &AhackdCharacter::ShootSilk);
-
+	PlayerInputComponent->BindAction("ConstraintSwing", IE_Released, this, &AhackdCharacter::SetConstraintSwing);
+	
+	PlayerInputComponent->BindAction("ReleaseConstraintSwing", IE_Released, this, &AhackdCharacter::ReleaseSilk);
 
 	PlayerInputComponent->BindAxis("MoveForward", this, &AhackdCharacter::MoveForward);
 	PlayerInputComponent->BindAxis("MoveRight", this, &AhackdCharacter::MoveRight);
@@ -159,6 +162,48 @@ void AhackdCharacter::MoveRight(float Value)
 }
 
 
+void AhackdCharacter::SetConstraintSwing() { 
+	if (bIsConstraintSwing == false) {
+		ConstraintSwing();
+	}
+	else {
+		RelaseConstraintSwing();
+	} 
+}
+
+void AhackdCharacter::ReleaseSilk() {
+	RelaseConstraintSwing();
+
+	bIsSilking = false;
+	HideRope();
+}
+void AhackdCharacter::RelaseConstraintSwing() {
+	bIsConstraintSwing = false;
+	if (swingemu && swingemu->IsPendingKill() == false) {
+		swingemu->Destroy();
+		swingemu = nullptr;
+	}
+}
+void AhackdCharacter::ConstraintSwing() {
+	bIsConstraintSwing = true; 
+	if (GetWorld() && SwingEmuClass) {
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = this;
+		SpawnParams.Instigator = GetInstigator();
+		FVector SpawnLoc;
+		FRotator SpawnRot = FRotator::ZeroRotator;
+
+		SpawnLoc = silk_target_pos;
+		swingemu = GetWorld()->SpawnActor<ASwingEmulator>(SwingEmuClass, SpawnLoc, SpawnRot, SpawnParams);
+		
+		verifyf(swingemu != nullptr, TEXT("swingemu can not null"));
+		swingemu->MyEmulate(silk_target_pos, GetActorLocation());
+		
+		//this->LaunchCharacter(FVector::ZeroVector,true,true);
+		//this->AttachToComponent(swingemu->GetSwingComponent(),FAttachmentTransformRules(EAttachmentRule::SnapToTarget,true));
+	
+	}
+}
 void AhackdCharacter::ShootSilk() {  
 	
 	FCollisionQueryParams RV_TraceParams = FCollisionQueryParams(FName(TEXT("RV_Trace")), true, this);
@@ -220,8 +265,8 @@ void AhackdCharacter::ShootSilk() {
 void AhackdCharacter::ProcessHitResult(const TArray<FHitResult>& HitResults) {
 	bool EverHited = false; 
 
-	FVector startp = this->GetMesh()->GetSocketLocation("hand_r");
-	FVector endp = startp;
+	FVector hand_r_pos = this->GetMesh()->GetSocketLocation("hand_r");
+	FVector hit_loc = hand_r_pos;
 	for (int i = 0; i < HitResults.Num() && EverHited == false; i++) {
 		auto HitRe = HitResults[i];
 
@@ -249,8 +294,8 @@ void AhackdCharacter::ProcessHitResult(const TArray<FHitResult>& HitResults) {
 		if (HitActor->GetUniqueID() == this->GetUniqueID()) {
 			continue;
 		}
-		startp = this->GetMesh()->GetSocketLocation("hand_r");
-		endp = Location;
+		hand_r_pos = this->GetMesh()->GetSocketLocation("hand_r");
+		hit_loc = Location;
 
 
 		
@@ -262,70 +307,65 @@ void AhackdCharacter::ProcessHitResult(const TArray<FHitResult>& HitResults) {
 	myrope->bAttachStart = true;
 	myrope->bAttachEnd = true;
 
-	float silklen = (startp - endp).Size();
+	float silklen = (hand_r_pos - hit_loc).Size();
 	if (silklen > 5) {
-		silk_target_pos = endp;
+		silk_target_pos = hit_loc;
 		auto rota = UKismetMathLibrary::FindLookAtRotation(GetActorLocation(), silk_target_pos);
 		FRotator rott; rott.Roll = 0; rott.Pitch = 0; rott.Yaw = rota.Yaw;
 		this->SetActorRotation(rott);
 		 
 		bIsSilking = true; 
 		 
-		//myrope->SetWorldLocation(startp);
-		/*
-		myrope->EndLocation = endp - startp;
-		myrope->CableLength = silklen;
-
-		if (silklen > tmpmin) {
-			myrope->CableLength = silklen - tmpmin;
-		} 
-		*/
-		/*
-		if (HitActor != nullptr && HitComponent != nullptr) {
-			myrope->SetAttachEndTo(HitActor, FName(HitComponent->GetName()), HitBoneName);
-			myrope->EndLocation = FVector::ZeroVector;
-
-		}
-		*/
+		RelaseConstraintSwing();
+		//ConstraintSwing();
 	}
 	else {
 		UE_LOG(LogClass, Log, TEXT("silkelen < 0"));
-		myrope->SetWorldLocation(startp);
-		myrope->EndLocation = FVector::ZeroVector;
-		myrope->CableLength = 0; 
+		HideRope();
 		bIsSilking = false;
 	}
 
 
 }
+
+void  AhackdCharacter::HideRope() {
+	FVector hand_r_relative_pos = this->GetMesh()->GetSocketTransform("hand_r", ERelativeTransformSpace::RTS_Actor).GetLocation();
+	FVector hand_r_world_loc = this->GetMesh()->GetSocketLocation("hand_r");
+
+	myrope->SetWorldLocation(hand_r_world_loc);
+	myrope->EndLocation = hand_r_relative_pos;
+	myrope->CableLength = 0;
+}
+void  AhackdCharacter::BeginPlay() {
+	Super::BeginPlay();
+	HideRope();
+}
 void AhackdCharacter::Tick(float DeltaTime) { 
 	Super::Tick(DeltaTime);
 
 	if (bIsSilking) {
-		FVector startp = this->GetMesh()->GetSocketTransform("hand_r", ERelativeTransformSpace::RTS_Actor).GetLocation();
+		FVector hand_r_relative_pos = this->GetMesh()->GetSocketTransform("hand_r", ERelativeTransformSpace::RTS_Actor).GetLocation();
+		FVector hand_r_world_loc = this->GetMesh()->GetSocketLocation("hand_r");
 		FVector Forc = silk_target_pos - GetActorLocation();
-		Forc.Normalize(); 
-
+		Forc.Normalize();  
 		auto silklen = (silk_target_pos - GetActorLocation()).Size();
 		Forc *= tan_huang_foc;
 		Forc *=  (silklen * tan_huang_k); 
 
-		this->LaunchCharacter(Forc, true, true);
-		//GetCharacterMovement()->AddForce(Forc); 
-		//myrope->EndLocation = silk_target_pos - startp;
-		auto rota = UKismetMathLibrary::FindLookAtRotation(startp, silk_target_pos);
-
+		if (bIsConstraintSwing == false) { 
+			this->LaunchCharacter(Forc, true, true);
+		}
+		else {
+			//this->AttachToComponent(swingemu->GetSwingComponent(), FAttachmentTransformRules::SnapToTargetNotIncludingScale);
+			 //FAttachmentTransformRules::
+		}
+		auto rota = UKismetMathLibrary::FindLookAtRotation(hand_r_world_loc, silk_target_pos);
 		myrope->SetWorldLocationAndRotation(silk_target_pos, rota); 
-		myrope->EndLocation = startp;
+		myrope->EndLocation = hand_r_relative_pos;
 		myrope->CableLength = silklen;
 		if (silklen < silk_mindis_to_care) {
-			bIsSilking = false;
-
-			FVector hand_r_world_loc = this->GetMesh()->GetSocketLocation("hand_r");
-			myrope->SetWorldLocation(hand_r_world_loc); 
-			//yrope->SetRelativeLocation(startp);
-			//myrope->EndLocation = FVector::ZeroVector;
-			myrope->CableLength = 0;
+			//ConstraintSwing();
+			ReleaseSilk();
 		}
 	}
 }
