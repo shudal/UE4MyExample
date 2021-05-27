@@ -349,7 +349,7 @@ void AhackdCharacter::Tick(float DeltaTime) {
 		if (bIsConstraintSwing) {
 			auto b1 = GetMovementComponent()->IsFalling();
 			if (b1 == false) {
-				//RelaseConstraintSwing();
+				RelaseConstraintSwing();
 			}
 		}
 
