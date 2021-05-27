@@ -115,7 +115,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		bool bIsSilking = false;
-	FVector silk_target_pos = FVector::ZeroVector;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		FVector silk_target_pos = FVector::ZeroVector;
 
 	void Tick(float DeltaTime) override;
 
@@ -125,5 +128,15 @@ public:
 		float tan_huang_k = 0.5;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 		float silk_mindis_to_care = 200;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		FVector follow_camera_normal_rel_loc;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		FVector follow_camera_const_rel_loc;
+
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+		float silk_shoot_dis = 3500;
+
 };
 

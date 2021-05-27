@@ -51,23 +51,13 @@ AhackdCharacter::AhackdCharacter()
 
 	// Note: The skeletal mesh and anim blueprint references on the Mesh component (inherited from Character) 
 	// are set in the derived blueprint asset named MyCharacter (to avoid direct content references in C++)
-
-	/*
-	USceneComponent* createdComp = NewObject<USceneComponent>(this, UCableComponent::StaticClass(), TEXT("mrope"));
-	if (createdComp)
-	{
-		createdComp->RegisterComponent();
-		//createdComp->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
-		createdComp->SetupAttachment(RootComponent);
-		myrope = (UCableComponent*)createdComp;
-	}
-	*/
+	 
 	
 	myrope = CreateDefaultSubobject<UCableComponent>(TEXT("MySilkRope"));
 	myrope->SetupAttachment(RootComponent);  
 
-	//myphycon = CreateDefaultSubobject<UPhysicsConstraintComponent>(TEXT("myphycon"));
-	//myphycon->SetupAttachment(RootComponent);
+	follow_camera_normal_rel_loc = FVector(0, -40, 30);
+	follow_camera_const_rel_loc = FVector(-250, 0, 100);
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -163,6 +153,10 @@ void AhackdCharacter::MoveRight(float Value)
 
 
 void AhackdCharacter::SetConstraintSwing() { 
+	if (bIsSilking == false) {
+		return;
+	}
+
 	if (bIsConstraintSwing == false) {
 		ConstraintSwing();
 	}
@@ -183,9 +177,13 @@ void AhackdCharacter::RelaseConstraintSwing() {
 		swingemu->Destroy();
 		swingemu = nullptr;
 	}
+	FollowCamera->SetRelativeLocation(follow_camera_normal_rel_loc);
 }
 void AhackdCharacter::ConstraintSwing() {
 	bIsConstraintSwing = true; 
+
+	FollowCamera->SetRelativeLocation(follow_camera_const_rel_loc);
+
 	if (GetWorld() && SwingEmuClass) {
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.Owner = this;
@@ -203,6 +201,7 @@ void AhackdCharacter::ConstraintSwing() {
 		//this->AttachToComponent(swingemu->GetSwingComponent(),FAttachmentTransformRules(EAttachmentRule::SnapToTarget,true));
 	
 	}
+
 }
 void AhackdCharacter::ShootSilk() {  
 	
@@ -229,7 +228,7 @@ void AhackdCharacter::ShootSilk() {
 
 	//Rot = UKismetMathLibrary::FindLookAtRotation(FollowCamera->GetComponentLocation(), GetActorLocation());
 	//End = GetActorLocation() + UKismetMathLibrary::GetForwardVector(Rot) * 1500;
-	End = GetActorLocation() + Rot.Vector() * 3500;
+	End = GetActorLocation() + Rot.Vector() * silk_shoot_dis;
 	if (GetWorld()) {
 		//GetWorld()->PersistentLineBatcher->DrawLine(Start, End, FLinearColor::Red,1,10,5);
 	}
@@ -343,7 +342,17 @@ void  AhackdCharacter::BeginPlay() {
 void AhackdCharacter::Tick(float DeltaTime) { 
 	Super::Tick(DeltaTime);
 
+
+
 	if (bIsSilking) {
+
+		if (bIsConstraintSwing) {
+			auto b1 = GetMovementComponent()->IsFalling();
+			if (b1 == false) {
+				//RelaseConstraintSwing();
+			}
+		}
+
 		FVector hand_r_relative_pos = this->GetMesh()->GetSocketTransform("hand_r", ERelativeTransformSpace::RTS_Actor).GetLocation();
 		FVector hand_r_world_loc = this->GetMesh()->GetSocketLocation("hand_r");
 		FVector Forc = silk_target_pos - GetActorLocation();

@@ -39,6 +39,14 @@ void ASwingEmulator::MyEmulate(FVector target_pos, FVector player_pos) {
 		myphycon->AttachToComponent(GetRootComponent(), FAttachmentTransformRules::KeepRelativeTransform);
 		myphycon->SetConstrainedComponents(smori, "None", smswing,"None");
 		smswing->SetSimulatePhysics(true);
+		
+		/*
+		myphycon->SetAngularSwing1Limit(EAngularConstraintMotion::ACM_Free, 90);
+		myphycon->SetAngularSwing2Limit(EAngularConstraintMotion::ACM_Free, 90);
+		myphycon->SetLinearXLimit(ELinearConstraintMotion::LCM_Free, 0);
+		myphycon->SetLinearYLimit(ELinearConstraintMotion::LCM_Free, 0);
+		myphycon->SetLinearZLimit(ELinearConstraintMotion::LCM_Free, 0);
+		*/
 	}
 }
 
